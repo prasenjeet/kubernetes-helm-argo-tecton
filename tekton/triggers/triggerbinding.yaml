@@ -1,0 +1,17 @@
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerBinding
+metadata:
+  name: github-push-binding
+  namespace: tekton-pipelines
+spec:
+  params:
+    # Extract fields from the GitHub push webhook payload
+    - name: repo-url
+      value: $(body.repository.clone_url)
+    - name: revision
+      value: $(body.after)
+    - name: branch
+      value: $(body.ref)
+    - name: image-tag
+      # Use the short commit SHA as the image tag
+      value: $(body.after[0:7])

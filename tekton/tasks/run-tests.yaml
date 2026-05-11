@@ -1,0 +1,45 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: run-tests
+  namespace: tekton-pipelines
+  labels:
+    app.kubernetes.io/version: "0.1"
+  annotations:
+    tekton.dev/categories: Testing
+    tekton.dev/tags: python, pytest
+spec:
+  description: Run Python unit tests using pytest.
+
+  params:
+    - name: test-dir
+      type: string
+      description: Path to the tests directory relative to the workspace.
+      default: "app"
+
+  workspaces:
+    - name: source
+      description: The workspace containing the application source code.
+
+  results:
+    - name: test-result
+      description: Pass or Fail outcome of the test run.
+
+  steps:
+    - name: install-deps
+      image: python:3.12-slim
+      workingDir: $(workspaces.source.path)/$(params.test-dir)
+      script: |
+        #!/usr/bin/env sh
+        set -eu
+        pip install --no-cache-dir -r requirements.txt
+
+    - name: pytest
+      image: python:3.12-slim
+      workingDir: $(workspaces.source.path)/$(params.test-dir)
+      script: |
+        #!/usr/bin/env sh
+        set -eu
+        pip install --no-cache-dir -r requirements.txt
+        python -m pytest tests/ -v --tb=short 2>&1
+        echo -n "Pass" > "$(results.test-result.path)"

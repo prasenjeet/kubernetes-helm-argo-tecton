@@ -1,0 +1,52 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: sample-app
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: Sample application project managed by Argo CD
+
+  sourceRepos:
+    - https://github.com/example/kubernetes-helm-argo-tecton.git
+
+  destinations:
+    - namespace: sample-app-staging
+      server: https://kubernetes.default.svc
+    - namespace: sample-app-production
+      server: https://kubernetes.default.svc
+
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+
+  namespaceResourceWhitelist:
+    - group: apps
+      kind: Deployment
+    - group: ""
+      kind: Service
+    - group: ""
+      kind: ConfigMap
+    - group: ""
+      kind: ServiceAccount
+    - group: networking.k8s.io
+      kind: Ingress
+    - group: autoscaling
+      kind: HorizontalPodAutoscaler
+
+  roles:
+    - name: developer
+      description: Developer read-only access
+      policies:
+        - p, proj:sample-app:developer, applications, get, sample-app/*, allow
+        - p, proj:sample-app:developer, applications, sync, sample-app/*, allow
+      groups:
+        - developers
+
+    - name: admin
+      description: Admin full access
+      policies:
+        - p, proj:sample-app:admin, applications, *, sample-app/*, allow
+      groups:
+        - platform-team

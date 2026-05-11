@@ -1,0 +1,40 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: sample-app-production
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  labels:
+    environment: production
+    app: sample-app
+spec:
+  project: sample-app
+
+  source:
+    repoURL: https://github.com/example/kubernetes-helm-argo-tecton.git
+    targetRevision: HEAD
+    path: helm/sample-app
+    helm:
+      valueFiles:
+        - values.yaml
+        - values-production.yaml
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: sample-app-production
+
+  syncPolicy:
+    # Manual sync for production — requires explicit approval
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 5m
+
+  revisionHistoryLimit: 10
