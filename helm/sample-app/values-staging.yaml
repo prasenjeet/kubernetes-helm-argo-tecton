@@ -1,0 +1,24 @@
+replicaCount: 1
+
+image:
+  tag: "latest"
+
+ingress:
+  enabled: true
+  hosts:
+    - host: sample-app-staging.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 128Mi
+
+env:
+  ENVIRONMENT: staging
+  PORT: "8080"

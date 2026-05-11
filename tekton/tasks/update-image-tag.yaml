@@ -1,0 +1,66 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: update-image-tag
+  namespace: tekton-pipelines
+  labels:
+    app.kubernetes.io/version: "0.1"
+  annotations:
+    tekton.dev/categories: Deployment
+    tekton.dev/tags: git, gitops
+spec:
+  description: |
+    Update the image tag in the Helm values file and commit the change.
+    This triggers Argo CD to detect drift and sync the new image.
+
+  params:
+    - name: image-tag
+      type: string
+      description: New image tag to set.
+    - name: environment
+      type: string
+      description: Target environment (staging or production).
+      default: staging
+    - name: git-user-name
+      type: string
+      description: Git author name for the commit.
+      default: "Tekton CI"
+    - name: git-user-email
+      type: string
+      description: Git author email for the commit.
+      default: "tekton@example.com"
+
+  workspaces:
+    - name: source
+      description: Workspace containing the cloned GitOps repository.
+    - name: ssh-directory
+      optional: true
+      description: SSH credentials for pushing to the repository.
+
+  steps:
+    - name: update-and-push
+      image: alpine/git:2.43.0
+      workingDir: $(workspaces.source.path)
+      script: |
+        #!/usr/bin/env sh
+        set -eu
+
+        if [ -d "$(workspaces.ssh-directory.path)" ]; then
+          cp -r "$(workspaces.ssh-directory.path)" ~/.ssh
+          chmod 700 ~/.ssh
+          chmod 600 ~/.ssh/*
+        fi
+
+        git config user.name "$(params.git-user-name)"
+        git config user.email "$(params.git-user-email)"
+
+        VALUES_FILE="helm/sample-app/values-$(params.environment).yaml"
+
+        # Update the image tag using sed
+        sed -i "s|^  tag:.*|  tag: \"$(params.image-tag)\"|" "${VALUES_FILE}"
+
+        git add "${VALUES_FILE}"
+        git commit -m "ci: update $(params.environment) image tag to $(params.image-tag) [skip ci]"
+        git push origin HEAD
+
+        echo "Updated ${VALUES_FILE} with tag $(params.image-tag)"

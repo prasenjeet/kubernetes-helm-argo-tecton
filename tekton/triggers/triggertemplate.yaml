@@ -1,0 +1,56 @@
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerTemplate
+metadata:
+  name: sample-app-pipeline-template
+  namespace: tekton-pipelines
+spec:
+  params:
+    - name: repo-url
+      description: Source repository URL.
+    - name: revision
+      description: Git commit SHA.
+    - name: branch
+      description: Git branch ref (e.g. refs/heads/main).
+    - name: image-tag
+      description: Short commit SHA used as image tag.
+
+  resourcetemplates:
+    - apiVersion: tekton.dev/v1
+      kind: PipelineRun
+      metadata:
+        generateName: sample-app-ci-cd-
+        namespace: tekton-pipelines
+        labels:
+          tekton.dev/pipeline: sample-app-ci-cd
+          triggers.tekton.dev/trigger: github-push
+      spec:
+        pipelineRef:
+          name: sample-app-ci-cd
+        params:
+          - name: repo-url
+            value: $(tt.params.repo-url)
+          - name: revision
+            value: $(tt.params.revision)
+          - name: image
+            value: ghcr.io/example/sample-app
+          - name: image-tag
+            value: $(tt.params.image-tag)
+          - name: environment
+            value: staging
+        workspaces:
+          - name: shared-data
+            volumeClaimTemplate:
+              spec:
+                accessModes:
+                  - ReadWriteOnce
+                resources:
+                  requests:
+                    storage: 1Gi
+          - name: registry-credentials
+            secret:
+              secretName: registry-credentials
+          - name: git-credentials
+            secret:
+              secretName: git-ssh-credentials
+        timeouts:
+          pipeline: 1h

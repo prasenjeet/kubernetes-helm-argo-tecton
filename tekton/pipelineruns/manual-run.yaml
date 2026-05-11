@@ -1,0 +1,38 @@
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  name: sample-app-manual-run
+  namespace: tekton-pipelines
+  labels:
+    tekton.dev/pipeline: sample-app-ci-cd
+spec:
+  pipelineRef:
+    name: sample-app-ci-cd
+  params:
+    - name: repo-url
+      value: https://github.com/example/kubernetes-helm-argo-tecton.git
+    - name: revision
+      value: main
+    - name: image
+      value: ghcr.io/example/sample-app
+    - name: image-tag
+      value: "1.0.0"
+    - name: environment
+      value: staging
+  workspaces:
+    - name: shared-data
+      volumeClaimTemplate:
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi
+    - name: registry-credentials
+      secret:
+        secretName: registry-credentials
+    - name: git-credentials
+      secret:
+        secretName: git-ssh-credentials
+  timeouts:
+    pipeline: 1h

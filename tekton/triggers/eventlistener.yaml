@@ -1,0 +1,38 @@
+apiVersion: triggers.tekton.dev/v1beta1
+kind: EventListener
+metadata:
+  name: github-webhook-listener
+  namespace: tekton-pipelines
+spec:
+  serviceAccountName: tekton-triggers-sa
+  triggers:
+    - name: github-push-to-main
+      interceptors:
+        # Validate GitHub webhook signature
+        - ref:
+            name: github
+          params:
+            - name: secretRef
+              value:
+                secretName: github-webhook-secret
+                secretKey: secret
+            - name: eventTypes
+              value:
+                - push
+        # Only trigger on pushes to main
+        - ref:
+            name: cel
+          params:
+            - name: filter
+              value: >-
+                body.ref == 'refs/heads/main' &&
+                body.commits.size() > 0 &&
+                !(body.head_commit.message.contains('[skip ci]'))
+      bindings:
+        - ref: github-push-binding
+      template:
+        ref: sample-app-pipeline-template
+
+  resources:
+    kubernetesResource:
+      serviceType: ClusterIP

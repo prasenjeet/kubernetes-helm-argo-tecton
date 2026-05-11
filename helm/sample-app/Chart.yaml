@@ -1,0 +1,14 @@
+apiVersion: v2
+name: sample-app
+description: A sample Flask application deployed via Helm, Argo CD, and Tekton
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - flask
+  - kubernetes
+  - argocd
+  - tekton
+maintainers:
+  - name: platform-team
+    email: platform@example.com

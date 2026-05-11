@@ -1,0 +1,64 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: git-clone
+  namespace: tekton-pipelines
+  labels:
+    app.kubernetes.io/version: "0.9"
+  annotations:
+    tekton.dev/pipelines.minVersion: "0.38.0"
+    tekton.dev/categories: Git
+    tekton.dev/tags: git
+spec:
+  description: Clone a git repository into a workspace.
+
+  params:
+    - name: url
+      type: string
+      description: Repository URL to clone.
+    - name: revision
+      type: string
+      description: Branch, tag, or commit SHA to checkout.
+      default: main
+    - name: depth
+      type: string
+      description: Perform a shallow clone with this depth.
+      default: "1"
+
+  workspaces:
+    - name: output
+      description: The git repo will be cloned into this workspace.
+    - name: ssh-directory
+      optional: true
+      description: SSH credentials for private repositories.
+
+  results:
+    - name: commit
+      description: The precise commit SHA that was fetched.
+    - name: url
+      description: The precise URL that was fetched.
+
+  steps:
+    - name: clone
+      image: alpine/git:2.43.0
+      script: |
+        #!/usr/bin/env sh
+        set -eu
+
+        if [ -d "$(workspaces.ssh-directory.path)" ]; then
+          cp -r "$(workspaces.ssh-directory.path)" ~/.ssh
+          chmod 700 ~/.ssh
+          chmod 600 ~/.ssh/*
+        fi
+
+        git clone \
+          --depth "$(params.depth)" \
+          --branch "$(params.revision)" \
+          "$(params.url)" \
+          "$(workspaces.output.path)"
+
+        cd "$(workspaces.output.path)"
+        COMMIT=$(git rev-parse HEAD)
+        echo -n "${COMMIT}" > "$(results.commit.path)"
+        echo -n "$(params.url)" > "$(results.url.path)"
+        echo "Cloned $(params.url) at commit ${COMMIT}"

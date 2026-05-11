@@ -1,0 +1,137 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: sample-app-ci-cd
+  namespace: tekton-pipelines
+  labels:
+    app.kubernetes.io/version: "0.1"
+spec:
+  description: |
+    CI/CD pipeline for sample-app:
+      1. Clone the source repository
+      2. Run unit tests
+      3. Build and push the container image
+      4. Update the image tag in the GitOps repo (triggers Argo CD sync)
+
+  params:
+    - name: repo-url
+      type: string
+      description: Source repository URL.
+    - name: revision
+      type: string
+      description: Git branch/tag/commit to build.
+      default: main
+    - name: image
+      type: string
+      description: Container image name (without tag).
+      default: ghcr.io/example/sample-app
+    - name: image-tag
+      type: string
+      description: Image tag to build and push.
+      default: latest
+    - name: environment
+      type: string
+      description: Deployment environment (staging or production).
+      default: staging
+
+  workspaces:
+    - name: shared-data
+      description: Shared workspace for source code.
+    - name: registry-credentials
+      description: Docker registry credentials secret.
+    - name: git-credentials
+      description: SSH key for GitOps repo push.
+      optional: true
+
+  results:
+    - name: image-digest
+      description: Digest of the built image.
+      value: $(tasks.build-push-image.results.image-digest)
+    - name: image-url
+      description: Full image URL.
+      value: $(tasks.build-push-image.results.image-url)
+    - name: commit
+      description: Git commit SHA that was built.
+      value: $(tasks.clone-source.results.commit)
+
+  tasks:
+    - name: clone-source
+      taskRef:
+        name: git-clone
+      workspaces:
+        - name: output
+          workspace: shared-data
+        - name: ssh-directory
+          workspace: git-credentials
+      params:
+        - name: url
+          value: $(params.repo-url)
+        - name: revision
+          value: $(params.revision)
+
+    - name: run-tests
+      taskRef:
+        name: run-tests
+      runAfter:
+        - clone-source
+      workspaces:
+        - name: source
+          workspace: shared-data
+      params:
+        - name: test-dir
+          value: app
+
+    - name: build-push-image
+      taskRef:
+        name: build-push-image
+      runAfter:
+        - run-tests
+      workspaces:
+        - name: source
+          workspace: shared-data
+        - name: registry-credentials
+          workspace: registry-credentials
+      params:
+        - name: image
+          value: $(params.image)
+        - name: tag
+          value: $(params.image-tag)
+        - name: context
+          value: app
+        - name: build-target
+          value: production
+
+    - name: update-image-tag
+      taskRef:
+        name: update-image-tag
+      runAfter:
+        - build-push-image
+      workspaces:
+        - name: source
+          workspace: shared-data
+        - name: ssh-directory
+          workspace: git-credentials
+      params:
+        - name: image-tag
+          value: $(params.image-tag)
+        - name: environment
+          value: $(params.environment)
+
+  finally:
+    - name: pipeline-status
+      taskSpec:
+        steps:
+          - name: report
+            image: alpine:3.19
+            script: |
+              #!/usr/bin/env sh
+              echo "Pipeline completed."
+              echo "  Image: $(params.image):$(params.image-tag)"
+              echo "  Environment: $(params.environment)"
+      params:
+        - name: image
+          value: $(params.image)
+        - name: image-tag
+          value: $(params.image-tag)
+        - name: environment
+          value: $(params.environment)
