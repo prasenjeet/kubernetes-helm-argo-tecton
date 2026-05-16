@@ -7,9 +7,9 @@ metadata:
     app.kubernetes.io/version: "0.1"
   annotations:
     tekton.dev/categories: Image Build
-    tekton.dev/tags: buildah, image-build
+    tekton.dev/tags: kaniko, image-build
 spec:
-  description: Build a container image with Buildah and push to a registry.
+  description: Build a container image with Kaniko and push to a registry.
 
   params:
     - name: image
@@ -46,33 +46,25 @@ spec:
 
   steps:
     - name: build-and-push
-      image: quay.io/buildah/stable:v1.35
-      securityContext:
-        privileged: true
-      workingDir: $(workspaces.source.path)
-      script: |
-        #!/usr/bin/env bash
-        set -euo pipefail
-
-        IMAGE="$(params.image):$(params.tag)"
-        CONTEXT="$(workspaces.source.path)/$(params.context)"
-        DOCKERFILE="${CONTEXT}/$(params.dockerfile)"
-
-        # Configure registry credentials
-        mkdir -p /root/.docker
-        cp "$(workspaces.registry-credentials.path)/.dockerconfigjson" /root/.docker/config.json
-
-        buildah bud \
-          --target "$(params.build-target)" \
-          --tag "${IMAGE}" \
-          --file "${DOCKERFILE}" \
-          "${CONTEXT}"
-
-        buildah push \
-          --digestfile /tmp/image-digest \
-          "${IMAGE}"
-
-        DIGEST=$(cat /tmp/image-digest)
-        echo -n "${DIGEST}" > "$(results.image-digest.path)"
-        echo -n "${IMAGE}@${DIGEST}" > "$(results.image-url.path)"
-        echo "Successfully pushed ${IMAGE}@${DIGEST}"
+      image: gcr.io/kaniko-project/executor:latest
+      env:
+        - name: DOCKER_CONFIG
+          value: /kaniko/.docker
+      command:
+        - /kaniko/executor
+      args:
+        - --dockerfile=$(workspaces.source.path)/$(params.context)/$(params.dockerfile)
+        - --context=$(workspaces.source.path)/$(params.context)
+        - --destination=$(params.image):$(params.tag)
+        - --digest-file=/tekton/results/image-digest
+        - --skip-push-permission-check
+      volumeMounts:
+        - name: docker-config
+          mountPath: /kaniko/.docker
+  volumes:
+    - name: docker-config
+      secret:
+        secretName: registry-credentials
+        items:
+          - key: .dockerconfigjson
+            path: config.json
