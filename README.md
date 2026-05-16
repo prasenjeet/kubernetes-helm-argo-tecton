@@ -88,8 +88,8 @@ kubectl get secret argocd-initial-admin-secret -n argocd \
   -o jsonpath='{.data.password}' | base64 -d
 
 # Open the UI
-kubectl port-forward svc/argocd-server -n argocd 8080:443
-# Visit https://localhost:8080
+kubectl port-forward svc/argocd-server -n argocd 7070:443
+# Visit https://localhost:7070
 ```
 
 ### 2. Install Tekton
@@ -108,14 +108,14 @@ kubectl port-forward svc/tekton-dashboard -n tekton-pipelines 9097:9097
 # GitHub webhook HMAC secret
 kubectl create secret generic github-webhook-secret \
   -n tekton-pipelines \
-  --from-literal=secret=<your-webhook-secret>
+  --from-literal=secret=Welcome1
 
 # Container registry credentials
 kubectl create secret docker-registry registry-credentials \
   -n tekton-pipelines \
   --docker-server=ghcr.io \
-  --docker-username=<github-user> \
-  --docker-password=<github-token>
+  --docker-username=prasenj \
+  --docker-password=<password>
 
 # SSH key for GitOps commits
 kubectl create secret generic git-ssh-credentials \
@@ -152,7 +152,7 @@ kubectl get svc -n tekton-pipelines | grep el-github-webhook-listener
 ```
 
 In your GitHub repository → Settings → Webhooks:
-- **Payload URL**: `http://<external-ip>:8080`
+- **Payload URL**: `http://<external-ip>:7070`
 - **Content type**: `application/json`
 - **Secret**: value used in step 3
 - **Events**: Just the `push` event

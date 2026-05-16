@@ -10,11 +10,11 @@ spec:
     name: sample-app-ci-cd
   params:
     - name: repo-url
-      value: https://github.com/example/kubernetes-helm-argo-tecton.git
+      value: https://github.com/prasenjeet/kubernetes-helm-argo-tecton.git
     - name: revision
       value: main
     - name: image
-      value: ghcr.io/example/sample-app
+      value: ghcr.io/prasenj/sample-app
     - name: image-tag
       value: "1.0.0"
     - name: environment
