@@ -1,0 +1,40 @@
+trigger:
+  name: GitHub Push to Main
+  identifier: GitHub_Push_to_Main
+  orgIdentifier: default
+  projectIdentifier: sample_project
+  enabled: true
+  description: |
+    Fires the CD pipeline on every push to main, passing the short commit SHA as the image tag.
+    The pipeline expects that Tekton has already built and pushed the image for that SHA.
+  tags:
+    type: webhook
+
+  target:
+    pipelineIdentifier: Deploy_Sample_App
+    type: Pipeline
+    spec:
+      runtimeInputYaml: |
+        pipeline:
+          variables:
+            - name: imageTag
+              value: <+trigger.commitSha.substring(0, 7)>
+
+  source:
+    type: Webhook
+    spec:
+      type: Github
+      spec:
+        type: Push
+        spec:
+          connectorRef: GitHub
+          autoAbortPreviousExecutions: true
+          payloadConditions:
+            - key: targetBranch
+              operator: Equals
+              value: main
+          headerConditions: []
+          # Skip merge commits and [skip ci] messages
+          jexlCondition: >-
+            <+trigger.payload.commits.size()> > 0 &&
+            !<+trigger.payload.head_commit.message>.contains("[skip ci]")

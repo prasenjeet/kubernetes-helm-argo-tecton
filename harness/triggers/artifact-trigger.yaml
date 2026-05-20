@@ -1,0 +1,35 @@
+trigger:
+  name: On New Image Tag
+  identifier: On_New_Image_Tag
+  orgIdentifier: default
+  projectIdentifier: sample_project
+  enabled: true
+  description: |
+    Fires the CD pipeline whenever a new image tag is pushed to ghcr.io/example/sample-app.
+    Skips tags that match the pattern *-rc* (release candidates go through a separate flow).
+  tags:
+    type: artifact
+
+  target:
+    pipelineIdentifier: Deploy_Sample_App
+    type: Pipeline
+    spec:
+      runtimeInputYaml: |
+        pipeline:
+          variables:
+            - name: imageTag
+              value: <+trigger.artifact.build>
+
+  source:
+    type: Artifact
+    spec:
+      type: DockerRegistry
+      spec:
+        connectorRef: ghcr_registry
+        imagePath: example/sample-app
+        tag: regex
+        tagRegex: ^(?!.*-rc).*$   # exclude release-candidate tags
+        eventConditions:
+          - key: build
+            operator: NotEquals
+            value: latest          # never auto-deploy the floating 'latest' tag

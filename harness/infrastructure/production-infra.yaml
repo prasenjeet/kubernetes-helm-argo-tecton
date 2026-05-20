@@ -1,0 +1,13 @@
+infrastructureDefinition:
+  name: production-k8s
+  identifier: production_k8s
+  orgIdentifier: default
+  projectIdentifier: sample_project
+  environmentRef: production
+  deploymentType: Kubernetes
+  type: KubernetesDirect
+  spec:
+    connectorRef: k8s_production
+    namespace: sample-app-production
+    releaseName: release-<+INFRA_KEY_SHORT_ID>
+  allowSimultaneousDeployments: false

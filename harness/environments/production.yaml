@@ -1,0 +1,19 @@
+environment:
+  name: production
+  identifier: production
+  orgIdentifier: default
+  projectIdentifier: sample_project
+  type: Production
+  variables:
+    - name: ENVIRONMENT
+      type: String
+      value: production
+    - name: REPLICA_COUNT
+      type: String
+      value: "3"
+    - name: INGRESS_HOST
+      type: String
+      value: sample-app.example.com
+  tags:
+    env: production
+    managed-by: harness

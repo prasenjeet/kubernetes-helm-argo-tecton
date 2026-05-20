@@ -1,0 +1,17 @@
+connector:
+  name: GHCR Registry
+  identifier: ghcr_registry
+  orgIdentifier: default
+  projectIdentifier: sample_project
+  type: DockerRegistry
+  spec:
+    dockerRegistryUrl: https://ghcr.io
+    providerType: DockerHub
+    auth:
+      type: UsernamePassword
+      spec:
+        username: <+secrets.getValue("github_username")>
+        passwordRef: github_pat_token
+    delegateSelectors:
+      - sample-app-delegate
+    executeOnDelegate: true

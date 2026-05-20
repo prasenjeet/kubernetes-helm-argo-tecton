@@ -1,0 +1,42 @@
+service:
+  name: sample-app
+  identifier: sample_app
+  orgIdentifier: default
+  projectIdentifier: sample_project
+  serviceDefinition:
+    type: Kubernetes
+    spec:
+      manifests:
+        - manifest:
+            identifier: helm-chart
+            type: HelmChart
+            spec:
+              store:
+                type: Github
+                spec:
+                  connectorRef: GitHub
+                  gitFetchType: Branch
+                  branch: main
+                  folderPath: helm/sample-app
+              subChartName: ""
+              helmVersion: V3
+              skipResourceVersioning: false
+              enableDeclarativeRollback: true
+              valuesPaths:
+                - helm/sample-app/values.yaml
+
+      artifacts:
+        primary:
+          primaryArtifactRef: <+input>
+          sources:
+            - identifier: sample-app-image
+              spec:
+                connectorRef: ghcr_registry
+                imagePath: example/sample-app
+                tag: <+input>
+              type: DockerRegistry
+
+      variables:
+        - name: APP_VERSION
+          type: String
+          value: <+artifact.tag>

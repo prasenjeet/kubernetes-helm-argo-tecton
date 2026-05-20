@@ -1,0 +1,91 @@
+pipeline:
+  name: Rollback Sample App
+  identifier: Rollback_Sample_App
+  orgIdentifier: default
+  projectIdentifier: sample_project
+  description: Emergency rollback pipeline — reverts the Helm release to the previous revision.
+  tags:
+    app: sample-app
+    type: rollback
+
+  variables:
+    - name: targetEnvironment
+      type: String
+      description: "Environment to roll back: staging or production"
+      required: true
+      value: <+input>
+      allowedValues: staging,production
+
+  stages:
+    - stage:
+        name: Rollback Approval
+        identifier: Rollback_Approval
+        type: Approval
+        spec:
+          execution:
+            steps:
+              - step:
+                  name: Confirm Rollback
+                  identifier: Confirm_Rollback
+                  type: HarnessApproval
+                  timeout: 30m
+                  spec:
+                    approvalMessage: |
+                      **Emergency rollback requested for `<+pipeline.variables.targetEnvironment>`.**
+
+                      This will revert the Helm release to its previous revision.
+                      Approving will execute the rollback immediately.
+                    includePipelineExecutionHistory: true
+                    approvers:
+                      userGroups:
+                        - account.platform_team
+                      minimumCount: 1
+                      disallowPipelineExecutor: false
+
+    - stage:
+        name: Execute Rollback
+        identifier: Execute_Rollback
+        type: Custom
+        spec:
+          execution:
+            steps:
+              - step:
+                  name: Helm Rollback
+                  identifier: Helm_Rollback_Step
+                  type: ShellScript
+                  timeout: 10m
+                  spec:
+                    shell: Bash
+                    onDelegate: true
+                    source:
+                      type: Inline
+                      spec:
+                        script: |
+                          set -euo pipefail
+                          ENV="<+pipeline.variables.targetEnvironment>"
+
+                          if [ "${ENV}" = "production" ]; then
+                            NAMESPACE="sample-app-production"
+                            RELEASE="sample-app-production"
+                          else
+                            NAMESPACE="sample-app-staging"
+                            RELEASE="sample-app-staging"
+                          fi
+
+                          echo "Rolling back Helm release '${RELEASE}' in namespace '${NAMESPACE}'..."
+                          helm rollback "${RELEASE}" 0 --namespace "${NAMESPACE}" --wait --timeout 5m
+
+                          echo "Verifying rollback..."
+                          kubectl rollout status deployment -n "${NAMESPACE}" --timeout=2m
+
+                          CURRENT_TAG=$(kubectl get deployment -n "${NAMESPACE}" \
+                            -o jsonpath='{.items[0].spec.template.spec.containers[0].image}' \
+                            | cut -d: -f2)
+                          echo "Active image tag after rollback: ${CURRENT_TAG}"
+                    environmentVariables: []
+                    outputVariables:
+                      - name: rolledBackTag
+                        type: String
+                        value: CURRENT_TAG
+        when:
+          pipelineStatus: Success

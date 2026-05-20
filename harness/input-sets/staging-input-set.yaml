@@ -1,0 +1,27 @@
+inputSet:
+  name: Staging Deploy Input Set
+  identifier: staging_deploy_input_set
+  orgIdentifier: default
+  projectIdentifier: sample_project
+  pipeline:
+    identifier: Deploy_Sample_App
+    variables:
+      - name: imageTag
+        type: String
+        value: <+input>
+    stages:
+      - stage:
+          identifier: Deploy_to_Staging
+          spec:
+            service:
+              serviceInputs:
+                serviceDefinition:
+                  type: Kubernetes
+                  spec:
+                    artifacts:
+                      primary:
+                        primaryArtifactRef: sample-app-image
+                        sources:
+                          - identifier: sample-app-image
+                            spec:
+                              tag: <+input>

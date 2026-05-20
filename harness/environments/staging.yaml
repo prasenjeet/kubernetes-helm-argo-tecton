@@ -1,0 +1,19 @@
+environment:
+  name: staging
+  identifier: staging
+  orgIdentifier: default
+  projectIdentifier: sample_project
+  type: PreProduction
+  variables:
+    - name: ENVIRONMENT
+      type: String
+      value: staging
+    - name: REPLICA_COUNT
+      type: String
+      value: "1"
+    - name: INGRESS_HOST
+      type: String
+      value: sample-app-staging.example.com
+  tags:
+    env: staging
+    managed-by: harness

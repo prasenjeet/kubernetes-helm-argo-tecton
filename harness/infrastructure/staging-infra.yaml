@@ -1,0 +1,13 @@
+infrastructureDefinition:
+  name: staging-k8s
+  identifier: staging_k8s
+  orgIdentifier: default
+  projectIdentifier: sample_project
+  environmentRef: staging
+  deploymentType: Kubernetes
+  type: KubernetesDirect
+  spec:
+    connectorRef: k8s_staging
+    namespace: sample-app-staging
+    releaseName: release-<+INFRA_KEY_SHORT_ID>
+  allowSimultaneousDeployments: false

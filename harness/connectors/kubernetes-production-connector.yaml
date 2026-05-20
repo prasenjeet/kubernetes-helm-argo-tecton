@@ -1,0 +1,11 @@
+connector:
+  name: K8s Production Cluster
+  identifier: k8s_production
+  orgIdentifier: default
+  projectIdentifier: sample_project
+  type: K8sCluster
+  spec:
+    credential:
+      type: InheritFromDelegate
+    delegateSelectors:
+      - sample-app-delegate

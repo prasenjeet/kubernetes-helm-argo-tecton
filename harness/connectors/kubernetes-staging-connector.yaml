@@ -1,0 +1,11 @@
+connector:
+  name: K8s Staging Cluster
+  identifier: k8s_staging
+  orgIdentifier: default
+  projectIdentifier: sample_project
+  type: K8sCluster
+  spec:
+    credential:
+      type: InheritFromDelegate
+    delegateSelectors:
+      - sample-app-delegate

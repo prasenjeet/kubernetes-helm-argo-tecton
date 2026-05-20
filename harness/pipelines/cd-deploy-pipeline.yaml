@@ -1,0 +1,214 @@
+pipeline:
+  name: Deploy Sample App
+  identifier: Deploy_Sample_App
+  orgIdentifier: default
+  projectIdentifier: sample_project
+  description: |
+    Deploys sample-app via Helm to staging, waits for approval, then promotes to production.
+    Triggered automatically on new container image tags or manually with a specific tag.
+  tags:
+    app: sample-app
+    managed-by: harness
+
+  variables:
+    - name: imageTag
+      type: String
+      description: Container image tag to deploy.
+      required: true
+      value: <+input>
+
+  stages:
+    # ── Stage 1: Deploy to Staging ─────────────────────────────────────────────
+    - stage:
+        name: Deploy to Staging
+        identifier: Deploy_to_Staging
+        type: Deployment
+        spec:
+          deploymentType: Kubernetes
+          service:
+            serviceRef: sample_app
+            serviceInputs:
+              serviceDefinition:
+                type: Kubernetes
+                spec:
+                  artifacts:
+                    primary:
+                      primaryArtifactRef: sample-app-image
+                      sources:
+                        - identifier: sample-app-image
+                          spec:
+                            tag: <+pipeline.variables.imageTag>
+          environment:
+            environmentRef: staging
+            deployToAll: false
+            infrastructureDefinitions:
+              - identifier: staging_k8s
+          execution:
+            steps:
+              - step:
+                  name: Helm Deploy
+                  identifier: Helm_Deploy_Staging
+                  type: HelmDeploy
+                  timeout: 10m
+                  spec:
+                    skipDryRun: false
+                    ignoreReleaseHistFailStatus: false
+                    valuesPaths:
+                      - helm/sample-app/values.yaml
+                      - helm/sample-app/values-staging.yaml
+                    setValues:
+                      - key: image.tag
+                        value: <+pipeline.variables.imageTag>
+                      - key: replicaCount
+                        value: <+env.variables.REPLICA_COUNT>
+                      - key: env.ENVIRONMENT
+                        value: <+env.variables.ENVIRONMENT>
+
+              - step:
+                  name: Verify Staging Rollout
+                  identifier: Verify_Staging_Rollout
+                  type: K8sRollingRollout
+                  timeout: 5m
+                  spec: {}
+
+              - step:
+                  name: HTTP Health Check
+                  identifier: HTTP_Health_Check_Staging
+                  type: Http
+                  timeout: 30s
+                  spec:
+                    url: http://sample-app-staging.example.com/health
+                    method: GET
+                    assertion: <+httpResponseCode> == 200
+                    headers: []
+
+            rollbackSteps:
+              - step:
+                  name: Helm Rollback Staging
+                  identifier: Helm_Rollback_Staging
+                  type: HelmRollback
+                  timeout: 10m
+                  spec: {}
+
+    # ── Stage 2: Manual Approval Gate ──────────────────────────────────────────
+    - stage:
+        name: Approval to Promote
+        identifier: Approval_to_Promote
+        type: Approval
+        spec:
+          execution:
+            steps:
+              - step:
+                  name: Approve Production Deployment
+                  identifier: Approve_Production
+                  type: HarnessApproval
+                  timeout: 1d
+                  spec:
+                    approvalMessage: |
+                      **Staging deployment of `<+pipeline.variables.imageTag>` succeeded.**
+
+                      Please review the staging environment before approving promotion to production.
+
+                      Staging URL: http://sample-app-staging.example.com
+                    includePipelineExecutionHistory: true
+                    approvers:
+                      userGroups:
+                        - account.platform_team
+                      minimumCount: 1
+                      disallowPipelineExecutor: false
+                    approverInputs:
+                      - name: changeTicket
+                        defaultValue: ""
+        when:
+          pipelineStatus: Success
+
+    # ── Stage 3: Deploy to Production ──────────────────────────────────────────
+    - stage:
+        name: Deploy to Production
+        identifier: Deploy_to_Production
+        type: Deployment
+        spec:
+          deploymentType: Kubernetes
+          service:
+            serviceRef: sample_app
+            serviceInputs:
+              serviceDefinition:
+                type: Kubernetes
+                spec:
+                  artifacts:
+                    primary:
+                      primaryArtifactRef: sample-app-image
+                      sources:
+                        - identifier: sample-app-image
+                          spec:
+                            tag: <+pipeline.variables.imageTag>
+          environment:
+            environmentRef: production
+            deployToAll: false
+            infrastructureDefinitions:
+              - identifier: production_k8s
+          execution:
+            steps:
+              - step:
+                  name: Helm Deploy Production
+                  identifier: Helm_Deploy_Production
+                  type: HelmDeploy
+                  timeout: 15m
+                  spec:
+                    skipDryRun: false
+                    ignoreReleaseHistFailStatus: false
+                    valuesPaths:
+                      - helm/sample-app/values.yaml
+                      - helm/sample-app/values-production.yaml
+                    setValues:
+                      - key: image.tag
+                        value: <+pipeline.variables.imageTag>
+                      - key: replicaCount
+                        value: <+env.variables.REPLICA_COUNT>
+                      - key: env.ENVIRONMENT
+                        value: <+env.variables.ENVIRONMENT>
+
+              - step:
+                  name: Verify Production Rollout
+                  identifier: Verify_Production_Rollout
+                  type: K8sRollingRollout
+                  timeout: 10m
+                  spec: {}
+
+              - step:
+                  name: HTTP Health Check Production
+                  identifier: HTTP_Health_Check_Production
+                  type: Http
+                  timeout: 30s
+                  spec:
+                    url: https://sample-app.example.com/health
+                    method: GET
+                    assertion: <+httpResponseCode> == 200
+                    headers: []
+
+              - step:
+                  name: Notify Deployment Success
+                  identifier: Notify_Success
+                  type: ShellScript
+                  timeout: 1m
+                  spec:
+                    shell: Bash
+                    onDelegate: true
+                    source:
+                      type: Inline
+                      spec:
+                        script: |
+                          echo "Deployment of sample-app:<+pipeline.variables.imageTag> to production completed."
+                          echo "Change ticket: <+pipeline.stages.Approval_to_Promote.spec.execution.steps.Approve_Production.output.approverInputs.changeTicket>"
+                    environmentVariables: []
+                    outputVariables: []
+
+            rollbackSteps:
+              - step:
+                  name: Helm Rollback Production
+                  identifier: Helm_Rollback_Production
+                  type: HelmRollback
+                  timeout: 10m
+                  spec: {}
+        when:
+          pipelineStatus: Success

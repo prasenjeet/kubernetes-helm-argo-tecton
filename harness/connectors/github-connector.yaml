@@ -1,0 +1,23 @@
+connector:
+  name: GitHub
+  identifier: GitHub
+  orgIdentifier: default
+  projectIdentifier: sample_project
+  type: Github
+  spec:
+    url: https://github.com/example/kubernetes-helm-argo-tecton
+    connectionType: Repo
+    authentication:
+      type: Http
+      spec:
+        type: UsernameToken
+        spec:
+          username: <+secrets.getValue("github_username")>
+          tokenRef: github_pat_token
+    apiAccess:
+      type: Token
+      spec:
+        tokenRef: github_pat_token
+    delegateSelectors:
+      - sample-app-delegate
+    executeOnDelegate: true
